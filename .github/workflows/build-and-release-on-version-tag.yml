@@ -1,0 +1,41 @@
+on:
+  push:
+    tags:
+    - 'v*'
+   
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    
+    steps:
+      - id: get_version
+        uses: battila7/get-version-action@v2
+      - uses: actions/checkout@v2
+      - uses: microsoft/setup-msbuild@v1
+      - uses: NuGet/setup-nuget@v1.0.5 
+      - run: |
+          .\update-libraries.ps1
+      - run: nuget restore "Graveyard.sln"
+      - run: |
+          msbuild.exe "Graveyard.sln" /p:platform="x86" /p:configuration="Release"
+      - run: |
+          7z a Graveyard.zip .\Graveyard\bin\x86\Release\Graveyard.dll .\Graveyard\bin\x86\Release\*-*
+      - uses: actions/create-release@v1
+        id: create_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: true
+          prerelease: false
+      - uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./Graveyard.zip
+          asset_name: Graveyard-${{ steps.get_version.outputs.version }}.zip
+          asset_content_type: application/zip
+          
+      
